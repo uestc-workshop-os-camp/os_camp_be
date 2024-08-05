@@ -1,7 +1,4 @@
-#[macro_use]
-extern crate rocket;
-
-use rocket::{catch, catchers, launch, serde::json::{json, Value}};
+use rocket::{catch, catchers, launch, serde::json::{json, Value},routes};
 use rocket_cors::{Cors, CorsOptions,AllowedOrigins,AllowedHeaders};
 
 // 处理404
@@ -25,7 +22,7 @@ fn cors_fairing() -> Cors {
 }
 
 #[launch]
-pub fn rocket() -> _{
+pub fn rocket() -> _ {
     rocket::build()
     .mount("/api", routes![])
     .attach(cors_fairing())
