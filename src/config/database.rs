@@ -6,6 +6,6 @@ use diesel::mysql::MysqlConnection;
  */
 pub fn establish_connection() -> Pool<ConnectionManager<MysqlConnection>> {
     Pool::builder()
-        .build(ConnectionManager::<MysqlConnection>::new("mysql://root:YuanRui20050614@localhost/os_web"))
+        .build(ConnectionManager::<MysqlConnection>::new("mysql://root:YuanRui!20050614@localhost/os_web"))
         .expect("Failed to create connection pool.")
 }
