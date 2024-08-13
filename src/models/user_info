@@ -1,0 +1,15 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug,Deserialize,Serialize)]
+pub struct UserInfo {
+    pub id: i32,
+    pub username: String,
+    pub header_url: String,
+    pub ch3: i32,
+    pub ch4: i32,
+    pub ch5: i32,
+    pub ch6: i32,
+    pub ch8: i32,
+}
+
+pub mod UserInfo;
