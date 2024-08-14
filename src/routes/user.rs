@@ -1,4 +1,6 @@
-use rocket::serde::json::{json, Json, Value};
+use std::collections::HashMap;
+
+use rocket::{post, serde::json::{json, Json, Value}};
 use reqwest::{Client,header};
 use serde::Deserialize;
 
@@ -13,7 +15,7 @@ const CLIENT_ID: &str = "Iv23li5eMNkhLTYR3wLU";
 const CLIENT_SECRET: &str = "b5c5cac90a0ec07782f0bb0e4230340ead22f817";
 
 #[post("/login/<code>",format = "json")]
-pub async fn login(code: String) -> JSON<Value> {
+pub async fn login(code: String) -> Json<Value> {
     // 拼接url
     let url = format!(
         "http://github.com/login/oauth/access_token?client_id={}&client_secret={}&code={}",
@@ -21,7 +23,7 @@ pub async fn login(code: String) -> JSON<Value> {
     );
     // 发送post请求
     // 创建请求头
-    let headers = header::HeaderMap::new();
+    let mut headers = header::HeaderMap::new();
     // 设置 Content-Type 请求头为 application/json
     headers.insert(header::CONTENT_TYPE, header::HeaderValue::from_static("application/json"));
 
@@ -31,7 +33,7 @@ pub async fn login(code: String) -> JSON<Value> {
             // 检查响应状态并解析响应体为 JSON
             if response.status().is_success() {
                 match response.json::<HashMap<String, String>>().await {
-                    Ok(json) => Json(json.into()), // 将响应转换为 JSON 格式返回
+                    Ok(json) => Json(serde_json::to_value(json).unwrap()), // 将响应转换为 JSON 格式返回
                     Err(_) => Json(json!({"error": "Failed to parse JSON response"})),
                 }
             } else {
@@ -40,4 +42,4 @@ pub async fn login(code: String) -> JSON<Value> {
         }
         Err(_) => Json(json!({"error": "Request failed"})),
     }
-} 
+}

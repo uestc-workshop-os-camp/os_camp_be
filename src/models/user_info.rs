@@ -1,11 +1,14 @@
 use serde::{Deserialize, Serialize};
-use diesel::prelude::Queryable;
+use diesel::{dsl::{insert_into, sum}, prelude::{Insertable, Queryable}, ExpressionMethods, QueryDsl, RunQueryDsl, Selectable};
 use crate::config::database::establish_connection;
+// use crate::schema::user_info::dsl::user_info;
 
-#[derive(Debug,Deserialize,Serialize,Queryable)]
-#[serde(create = "rocket::serde")]
+#[derive(Debug,Deserialize,Serialize,Insertable,Selectable,Queryable)]
+#[diesel(table_name = crate::schema::user_info)]
+#[serde(crate = "rocket::serde")]
+#[diesel(check_for_backend(diesel::mysql::Mysql))]
 pub struct UserInfo {
-    pub id: Option<i32>,
+    pub id: Option<u32>,
     pub username: String,
     pub header_url: String,
     pub ch3: i32,
@@ -17,13 +20,15 @@ pub struct UserInfo {
 
 impl UserInfo {
     pub fn page(offset: i32,limit: i32) -> Result<Vec<UserInfo>, diesel::result::Error> {
-        use create::schema::user_info::dsl::*;
+        use crate::schema::user_info::dsl::*;
 
+        let conn_poll =&mut establish_connection();
+        let conn = &mut conn_poll.get().unwrap();
         let results = user_info
         .order_by(sum(ch3 + ch4 + ch5 + ch6 + ch8).desc()) // 按总成绩降序排列
         .limit(limit.into())
         .offset(offset.into())
-        .load::<UserInfo>(&conn)?;
+        .load::<UserInfo>(conn)?;
 
         Ok(results)
     }
@@ -39,17 +44,16 @@ impl UserInfo {
             ch6: 0,
             ch8: 0,
         }
-    } 
+    }
 
-    pub fn insert(userInfo: UserInfo) -> Result<(),diesel::result::Error> {
-        use create::schema::user_info::dsl::*;
+    pub fn insert(userInfo: &UserInfo) -> Result<(),diesel::result::Error> {
+        use crate::schema::user_info::dsl::*;
 
-        let conn = establish_connection();
-
+        let conn_poll = &mut establish_connection();
+        let conn = &mut conn_poll.get().unwrap();
         insert_into(user_info) 
-            .values(&user_info)
-            .execute(&conn)?;
-
+            .values(userInfo)
+            .execute(conn)?;
         Ok(())
     }
 }

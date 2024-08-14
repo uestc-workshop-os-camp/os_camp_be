@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 use reqwest::{Client,header};
 use base64::decode;
+use serde_json::Value;
 use crate::models::user_info;
 use serde::{Deserialize, Serialize};
 
@@ -7,7 +10,7 @@ const TOKEN: &str = "Bearer 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";
 const ORGANIZER: &str = "uestc-workshop-os-camp";
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Reop {
+struct Repo {
     id: u64,
     name: String,
     owner: Owner,
@@ -40,17 +43,17 @@ pub async fn get_score() {
     // Create a new HTTP client with the headers
     let client = Client::builder()
     .default_headers(headers)
-    .build()?;
+    .build().unwrap();
 
     loop {
         interval.tick().await;
         // task
         // Send a GET request to the URL
         match client.get(&url).send().await {
-            ok(resp) => {
-                if resp.status().is_success() {
+            Ok(response) => {
+                if response.status().is_success() {
                     // 解析 JSON 响应
-                    let repos: Vec<Repo> = response.json().await?;
+                    let repos: Vec<Repo> = response.json().await.unwrap();
 
                     for repo in repos {
                         if repo.name.starts_with("rcore-camp-") {
@@ -60,17 +63,17 @@ pub async fn get_score() {
                                 let latest_json_url = format!("https://api.github.com/repos/{}/{}/contents/latest.json", username, repo.name);
                                 
                                 match client.get(&latest_json_url).send().await {
-                                    ok(response) => {
+                                    Ok(response) => {
                                         if response.status().is_success() {
-                                            let latest_json_file: JsonFile = response.json().await?;
+                                            let latest_json_file: JsonFile = response.json().await.unwrap();
                                             // 解码 Base64 字符串
-                                            let decoded_bytes = decode(&latest_json_file.content)?;
+                                            let decoded_bytes = decode(&latest_json_file.content).unwrap();
 
                                             // 将解码后的字节序列转换为字符串
-                                            let decoded_str = String::from_utf8(decoded_bytes)?;
+                                            let decoded_str = String::from_utf8(decoded_bytes).unwrap();
 
                                             // 解析字符串为 JSON
-                                            let json_data: Value = serde_json::from_str(&decoded_str)?;
+                                            let json_data: Value = serde_json::from_str(&decoded_str).unwrap();
 
                                             if let Value::Object(map) = json_data {
                                                 let data: HashMap<String, Value> = map.into_iter().collect();
@@ -81,14 +84,14 @@ pub async fn get_score() {
                                                     let score_file_url = format!("https://api.github.com/repos/{}/{}/contents/{}",username,repo.name,value);
 
                                                     match client.get(&score_file_url).send().await {
-                                                        ok(res) => {
+                                                        Ok(res) => {
                                                             if res.status().is_success() {
-                                                                let file: JsonFile = res.json.await?;
+                                                                let file: JsonFile = res.json().await.unwrap();
                                                                 // 解码 Base64 字符串
-                                                                let decoded = decode(&file.content)?;
+                                                                let decoded = decode(&file.content).unwrap();
 
                                                                 // 将解码后的字节序列转换为字符串
-                                                                let decoded_string = String::from_utf8(decoded)?;
+                                                                let decoded_string = String::from_utf8(decoded).unwrap();
                                                                 // 按空格分割字符串
                                                                 let parts: Vec<&str> = decoded_string.split_whitespace().collect();
                                                                 let score_part = parts[1];
@@ -111,28 +114,35 @@ pub async fn get_score() {
                                                                 }
                                                                 
                                                                 // 插入数据库
-                                                                if let Err(e) = user_info::UserInfo::insert(user_info) {
+                                                                if let Err(e) = user_info::UserInfo::insert(&user_info) {
                                                                     eprintln!("Failed to insert data: {:?}", e);
                                                                 }
                                                             }
                                                         }
+                                                        Err(err)=>{
+                                                            eprintln!("Failed: {}", err);
+                                                        }
                                                     }
                                                 }
-                                            } else {
-                                                Err("Expected a JSON object".into())
                                             }
+                                            // else {
+                                            //     Err("Expected a JSON object".into())
+                                            // }
                                         }
+                                    }
+                                    Err(err)=>{
+                                        eprintln!("Failed: {}", err);
                                     }
                                 }
                             }
                         }
                     }
                 }else{
-                    eprintln!("Failed to fetch repos: {}", resp.status());
+                    eprintln!("Failed to fetch repos: {}", response.status());
                 }
             }
-            Err(_) => {
-                eprintln!("Failed to fetch repos: {}", response.status());
+            Err(err) => {
+                eprintln!("Failed to fetch repos: {}", err);
             }
         }
     }

@@ -2,15 +2,15 @@
 
 diesel::table! {
     user_info (id) {
-        id -> Unsigned<Integer>,
+        id -> Nullable<Unsigned<Integer>>,
         #[max_length = 50]
         username -> Varchar,
         #[max_length = 50]
         header_url -> Varchar,
-        ch3 -> Nullable<Double>,
-        ch4 -> Nullable<Double>,
-        ch5 -> Nullable<Double>,
-        ch6 -> Nullable<Double>,
-        ch8 -> Nullable<Double>,
+        ch3 -> Integer,
+        ch4 -> Integer,
+        ch5 -> Integer,
+        ch6 -> Integer,
+        ch8 -> Integer,
     }
 }

@@ -1,5 +1,12 @@
+mod routes;
+mod models;
+mod config;
+mod schema;
+mod task;
+
 use rocket::{catch, catchers, launch, serde::json::{json, Value},routes};
 use rocket_cors::{Cors, CorsOptions,AllowedOrigins,AllowedHeaders};
+use task::getScoreTask::get_score;
 use crate::routes::score::getScores;
 
 // 处理404
@@ -22,8 +29,9 @@ fn cors_fairing() -> Cors {
     .expect("Cors fairing cannot be created")
 }
 
+// by noah: maybe non-async
 #[launch]
-pub fn rocket() -> _ {
+pub async fn rocket() -> _ {
     // 创建 Rocket 实例
     let rocket = rocket::build()
     .mount("/api", routes![getScores])

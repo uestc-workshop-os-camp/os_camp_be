@@ -3,5 +3,6 @@ use rocket;
 
 #[rocket::main]
 async fn main() -> Result<(), rocket::Error> {
-    os_web::rocket().launch().await.map(|_| ())
+    os_web::rocket().await.launch().await?;
+    Ok(())
 }
