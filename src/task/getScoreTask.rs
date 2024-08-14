@@ -3,8 +3,8 @@ use base64::decode;
 use crate::models::user_info;
 use serde::{Deserialize, Serialize};
 
-const token: &str = "Bearer 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";
-const orgnizer: &str = "uestc-workshop-os-camp";
+const TOKEN: &str = "Bearer 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";
+const ORGANIZER: &str = "uestc-workshop-os-camp";
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Reop {
@@ -19,7 +19,7 @@ struct Owner {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct LatestJsonFile {
+struct JsonFile {
     content: String
 }
 
@@ -33,10 +33,10 @@ pub async fn get_score() {
     let mut interval = interval(Duration::from_secs(3600));// 1h
 
     // format url
-    let url = format!("https://api.github.com/orgs/{}/repos",orgnizer);
+    let url = format!("https://api.github.com/orgs/{}/repos",ORGANIZER);
     // set header
-    let headers = header::HeaderMap::new();
-    headers.insert(header::AUTHORIZATION,header::HeaderValue::from_str(token));
+    let mut headers = header::HeaderMap::new();
+    headers.insert(header::AUTHORIZATION,header::HeaderValue::from_str(TOKEN).unwrap());
     // Create a new HTTP client with the headers
     let client = Client::builder()
     .default_headers(headers)
@@ -62,7 +62,7 @@ pub async fn get_score() {
                                 match client.get(&latest_json_url).send().await {
                                     ok(response) => {
                                         if response.status().is_success() {
-                                            let latest_json_file: LatestJsonFile = response.json().await?;
+                                            let latest_json_file: JsonFile = response.json().await?;
                                             // 解码 Base64 字符串
                                             let decoded_bytes = decode(&latest_json_file.content)?;
 
@@ -83,35 +83,37 @@ pub async fn get_score() {
                                                     match client.get(&score_file_url).send().await {
                                                         ok(res) => {
                                                             if res.status().is_success() {
-                                                                // Base64 解码
-                                                                let decoded_bytes = base64_decode(base64_str).map_err(|_| "Base64 解码失败")?;
-                                                                let decoded_str = String::from_utf8(decoded_bytes).map_err(|_| "UTF-8 解码失败")?;
+                                                                let file: JsonFile = res.json.await?;
+                                                                // 解码 Base64 字符串
+                                                                let decoded = decode(&file.content)?;
+
+                                                                // 将解码后的字节序列转换为字符串
+                                                                let decoded_string = String::from_utf8(decoded)?;
                                                                 // 按空格分割字符串
-                                                                let parts: Vec<&str> = decoded_str.split_whitespace().collect();
+                                                                let parts: Vec<&str> = decoded_string.split_whitespace().collect();
                                                                 let score_part = parts[1];
                                                                 // 按"/"分割以获取分子和分母
                                                                 let score_split: Vec<&str> = score_part.split('/').collect();
-                                                                let numerator: f64 = score_split[0].parse().map_err(|_| "解析分子失败")?;
-                                                                let denominator: f64 = score_split[1].parse().map_err(|_| "解析分母失败")?;
+                                                                let numerator: f64 = score_split[0].parse().unwrap();
+                                                                let denominator: f64 = score_split[1].parse().unwrap();
                                                                 // 计算小数形式的分数
                                                                 let score = (numerator / denominator) * 100.0;
 
-                                                                user_info.name = username;
-                                                                user_info.header_url = repo.owner.avatar_url;
-                                                                if key == "ch3" {
-                                                                    user_info.ch3 = score;
-                                                                }else if key == "ch4" {
-                                                                    user_info.ch4 = score;
-                                                                }else if key == "ch5" {
-                                                                    user_info.ch5 = score;
-                                                                }else if key == "ch6" {
-                                                                    user_info.ch6 = score;
-                                                                }else if key == "ch8" {
-                                                                    user_info.ch8 = score;
+                                                                user_info.username = username.to_string();
+                                                                user_info.header_url = repo.owner.avatar_url.clone();
+                                                                match key.as_str() {
+                                                                    "ch3" => user_info.ch3 = score as i32,
+                                                                    "ch4" => user_info.ch4 = score as i32,
+                                                                    "ch5" => user_info.ch5 = score as i32,
+                                                                    "ch6" => user_info.ch6 = score as i32,
+                                                                    "ch8" => user_info.ch8 = score as i32,
+                                                                    _ => (),
                                                                 }
                                                                 
-                                                                // insert into database
-                                                                user_info::insert(user_info)
+                                                                // 插入数据库
+                                                                if let Err(e) = user_info::UserInfo::insert(user_info) {
+                                                                    eprintln!("Failed to insert data: {:?}", e);
+                                                                }
                                                             }
                                                         }
                                                     }
@@ -125,6 +127,8 @@ pub async fn get_score() {
                             }
                         }
                     }
+                }else{
+                    eprintln!("Failed to fetch repos: {}", resp.status());
                 }
             }
             Err(_) => {

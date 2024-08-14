@@ -5,7 +5,7 @@ use crate::config::database::establish_connection;
 #[derive(Debug,Deserialize,Serialize,Queryable)]
 #[serde(create = "rocket::serde")]
 pub struct UserInfo {
-    pub id: i32,
+    pub id: Option<i32>,
     pub username: String,
     pub header_url: String,
     pub ch3: i32,
@@ -20,6 +20,7 @@ impl UserInfo {
         use create::schema::user_info::dsl::*;
 
         let results = user_info
+        .order_by(sum(ch3 + ch4 + ch5 + ch6 + ch8).desc()) // 按总成绩降序排列
         .limit(limit.into())
         .offset(offset.into())
         .load::<UserInfo>(&conn)?;
@@ -29,8 +30,9 @@ impl UserInfo {
 
     pub fn new() -> UserInfo {
         UserInfo {
-            username: "",
-            header_url: "",
+            id: None,// auto increase
+            username: String::new(),
+            header_url: String::new(),
             ch3: 0,
             ch4: 0,
             ch5: 0,
@@ -42,8 +44,12 @@ impl UserInfo {
     pub fn insert(userInfo: UserInfo) -> Result<(),diesel::result::Error> {
         use create::schema::user_info::dsl::*;
 
-        
+        let conn = establish_connection();
+
+        insert_into(user_info) 
+            .values(&user_info)
+            .execute(&conn)?;
+
+        Ok(())
     }
 }
-
-pub mod UserInfo;

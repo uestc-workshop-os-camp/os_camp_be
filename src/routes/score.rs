@@ -61,3 +61,5 @@ pub async fn getScores(offset: i32,limit: i32,mode: i32) -> Value {
 
     result
 }
+
+pub mod score;

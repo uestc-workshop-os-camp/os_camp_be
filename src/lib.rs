@@ -1,5 +1,6 @@
 use rocket::{catch, catchers, launch, serde::json::{json, Value},routes};
 use rocket_cors::{Cors, CorsOptions,AllowedOrigins,AllowedHeaders};
+use crate::routes::score::getScores;
 
 // 处理404
 #[catch(404)]
@@ -23,8 +24,17 @@ fn cors_fairing() -> Cors {
 
 #[launch]
 pub fn rocket() -> _ {
-    rocket::build()
-    .mount("/api", routes![])
+    // 创建 Rocket 实例
+    let rocket = rocket::build()
+    .mount("/api", routes![getScores])
     .attach(cors_fairing())
-    .register("/", catchers![not_found])
+    .register("/", catchers![not_found]);
+
+     // 启动定时任务
+    rocket::tokio::spawn(async {
+        get_score().await;
+    });
+
+    // 返回 Rocket 实例
+    rocket
 }
