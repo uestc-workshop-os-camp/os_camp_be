@@ -1,13 +1,16 @@
-mod routes;
-mod models;
 mod config;
+mod models;
+mod routes;
 mod schema;
 mod task;
 
-use rocket::{catch, catchers, launch, serde::json::{json, Value},routes};
-use rocket_cors::{Cors, CorsOptions,AllowedOrigins,AllowedHeaders};
+use crate::routes::score::get_scores;
+use rocket::{
+    catch, catchers, launch, routes,
+    serde::json::{json, Value},
+};
+use rocket_cors::{AllowedHeaders, AllowedOrigins, Cors, CorsOptions};
 use task::get_score_task::get_score;
-use crate::routes::score::getScores;
 
 // 处理404
 #[catch(404)]
@@ -20,12 +23,13 @@ fn not_found() -> Value {
 
 // 配置跨域
 fn cors_fairing() -> Cors {
-	CorsOptions {
-		allowed_origins:AllowedOrigins::All,
-		allowed_headers: AllowedHeaders::All,
-		allow_credentials: true,
-		..Default::default()
-    }.to_cors()
+    CorsOptions {
+        allowed_origins: AllowedOrigins::All,
+        allowed_headers: AllowedHeaders::All,
+        allow_credentials: true,
+        ..Default::default()
+    }
+    .to_cors()
     .expect("Cors fairing cannot be created")
 }
 
@@ -34,11 +38,11 @@ fn cors_fairing() -> Cors {
 pub async fn rocket() -> _ {
     // 创建 Rocket 实例
     let rocket = rocket::build()
-    .mount("/api", routes![getScores])
-    .attach(cors_fairing())
-    .register("/", catchers![not_found]);
+        .mount("/api", routes![get_scores])
+        .attach(cors_fairing())
+        .register("/", catchers![not_found]);
 
-     // 启动定时任务
+    // 启动定时任务
     rocket::tokio::spawn(async {
         get_score().await;
     });
