@@ -6,7 +6,7 @@ mod task;
 
 use rocket::{catch, catchers, launch, serde::json::{json, Value},routes};
 use rocket_cors::{Cors, CorsOptions,AllowedOrigins,AllowedHeaders};
-use task::getScoreTask::get_score;
+use task::get_score_task::get_score;
 use crate::routes::score::getScores;
 
 // 处理404
