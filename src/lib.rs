@@ -1,3 +1,5 @@
+#![feature(trivial_bounds)]
+
 mod config;
 mod models;
 mod routes;

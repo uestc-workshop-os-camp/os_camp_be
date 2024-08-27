@@ -1,4 +1,4 @@
-use crate::models::user_info::{self, UserInfo};
+use crate::models::user_info::{page, UserInfo};
 #[allow(unused_imports)]
 use diesel::mysql::MysqlConnection;
 use rocket::{
@@ -26,7 +26,7 @@ struct Result {
 #[get("/scores/<offset>/<limit>/<mode>")]
 pub async fn get_scores(offset: i32, limit: i32, mode: i32) -> Json<Value> {
     let result: Json<Value> = match mode {
-        1 => match user_info::UserInfo::page(offset, limit) {
+        1 => match page(offset, limit) {
             Ok(users) => {
                 let response = Result {
                     code: 1,

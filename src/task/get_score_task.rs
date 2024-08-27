@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use crate::models::user_info;
+use crate::models::user_info::{self, insert};
 use base64::decode;
 use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-const TOKEN: &str = "Bearer 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";
+const TOKEN: &str = "";
 const ORGANIZER: &str = "uestc-workshop-os-camp";
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -97,9 +97,20 @@ pub async fn get_score() {
                                                                 let file: JsonFile =
                                                                     res.json().await.unwrap();
                                                                 // 解码 Base64 字符串
+                                                                // 预处理，去掉换行符
+                                                                let file_content =
+                                                                    file.content.replace("\n", "");
                                                                 let decoded =
-                                                                    decode(&file.content).unwrap();
-
+                                                                    match decode(&file_content) {
+                                                                        Ok(decode) => decode,
+                                                                        Err(err) => {
+                                                                            eprintln!(
+                                                                            "Failed to decode: {}",
+                                                                            err
+                                                                        );
+                                                                            continue;
+                                                                        }
+                                                                    };
                                                                 // 将解码后的字节序列转换为字符串
                                                                 let decoded_string =
                                                                     String::from_utf8(decoded)
@@ -122,36 +133,23 @@ pub async fn get_score() {
                                                                     / denominator)
                                                                     * 100.0;
 
-                                                                user_info.username =
-                                                                    username.to_string();
-                                                                user_info.header_url =
-                                                                    repo.owner.avatar_url.clone();
                                                                 match key.as_str() {
                                                                     "ch3" => {
-                                                                        user_info.ch3 = score as i32
+                                                                        user_info.ch3 = score
                                                                     }
                                                                     "ch4" => {
-                                                                        user_info.ch4 = score as i32
+                                                                        user_info.ch4 = score
                                                                     }
                                                                     "ch5" => {
-                                                                        user_info.ch5 = score as i32
+                                                                        user_info.ch5 = score
                                                                     }
                                                                     "ch6" => {
-                                                                        user_info.ch6 = score as i32
+                                                                        user_info.ch6 = score
                                                                     }
                                                                     "ch8" => {
-                                                                        user_info.ch8 = score as i32
+                                                                        user_info.ch8 = score
                                                                     }
                                                                     _ => (),
-                                                                }
-
-                                                                // 插入数据库
-                                                                if let Err(e) =
-                                                                    user_info::UserInfo::insert(
-                                                                        &user_info,
-                                                                    )
-                                                                {
-                                                                    eprintln!("Failed to insert data: {:?}", e);
                                                                 }
                                                             }
                                                         }
@@ -160,10 +158,46 @@ pub async fn get_score() {
                                                         }
                                                     }
                                                 }
+                                                user_info.username = username.to_string();
+                                                // 通过 github rest api 由用户名称获取用户信息
+                                                let github_user_info_url = format!(
+                                                    "https://api.github.com/users/{}",
+                                                    username
+                                                );
+                                                user_info.header_url = match client
+                                                    .get(&github_user_info_url)
+                                                    .send()
+                                                    .await
+                                                {
+                                                    Ok(res) => {
+                                                        if res.status().is_success() {
+                                                            //解析json
+                                                            let user_info: Owner =
+                                                                res.json().await.unwrap();
+                                                            // debug 打印 用户信息
+                                                            println!("{:?}", user_info);
+                                                            // 返回json中有avatar_url
+                                                            user_info.avatar_url
+                                                        } else {
+                                                            "".to_string()
+                                                        }
+                                                    }
+                                                    Err(err) => {
+                                                        eprintln!(
+                                                            "Failed to fetch user info: {}",
+                                                            err
+                                                        );
+                                                        "".to_string()
+                                                    }
+                                                };
+                                                println!("{:?}", user_info);
+                                                // 插入数据库
+                                                if let Err(e) =
+                                                    insert(&user_info)
+                                                {
+                                                    eprintln!("Failed to insert data: {:?}", e);
+                                                }
                                             }
-                                            // else {
-                                            //     Err("Expected a JSON object".into())
-                                            // }
                                         }
                                     }
                                     Err(err) => {

@@ -13,5 +13,6 @@ diesel = { version = "2.0", features = ["mysql","r2d2"] }
 # diesel_cli = { version = "2.0", features = ["mysql"] }
 tokio = { version = "1", features = ["full"] }
 base64 = "0.13"
-
+# 引入lazystatic对于数据库连接池的初始化
+lazy_static = "1.5.0"
 [build-dependencies]
