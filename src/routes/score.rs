@@ -12,8 +12,8 @@ use serde::Serialize;
  */
 #[derive(Debug, Serialize)]
 struct Result<T> {
-    code: i32,                         // 400表示失败 200表示成功
-    message: String,                   //错误信息，可以为空
+    code: i32,            // 400表示失败 200表示成功
+    message: String,      //错误信息，可以为空
     data: Option<Vec<T>>, // 排行榜信息
 }
 
@@ -25,8 +25,9 @@ struct Result<T> {
  */
 #[get("/scores/<offset>/<limit>/<mode>")]
 pub async fn get_scores(offset: i32, limit: i32, mode: i32) -> Json<Value> {
+    let offset = (offset - 1) * limit;
     let result: Json<Value> = match mode {
-        1 => match phase2_page(offset, limit) {
+        1 => match phase1_page(offset, limit) {
             Ok(users) => {
                 let response = Result {
                     code: 200,
@@ -36,7 +37,7 @@ pub async fn get_scores(offset: i32, limit: i32, mode: i32) -> Json<Value> {
                 Json(serde_json::json!(response))
             }
             Err(err) => {
-                let response:Result<Phase2UserInfo> = Result {
+                let response: Result<Phase2UserInfo> = Result {
                     code: 400,
                     message: format!("数据库错误: {}", err),
                     data: None,
@@ -44,7 +45,7 @@ pub async fn get_scores(offset: i32, limit: i32, mode: i32) -> Json<Value> {
                 Json(serde_json::json!(response))
             }
         },
-        2 => match phase1_page(offset, limit) {
+        2 => match phase2_page(offset, limit) {
             Ok(users) => {
                 let response = Result {
                     code: 200,
@@ -54,7 +55,7 @@ pub async fn get_scores(offset: i32, limit: i32, mode: i32) -> Json<Value> {
                 Json(serde_json::json!(response))
             }
             Err(err) => {
-                let response:Result<Phase2UserInfo> = Result {
+                let response: Result<Phase2UserInfo> = Result {
                     code: 400,
                     message: format!("数据库错误: {}", err),
                     data: None,
@@ -63,7 +64,7 @@ pub async fn get_scores(offset: i32, limit: i32, mode: i32) -> Json<Value> {
             }
         },
         _ => {
-            let response:Result<()> = Result {
+            let response: Result<()> = Result {
                 code: 0,
                 message: "无效的模式".to_string(),
                 data: None,

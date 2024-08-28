@@ -44,6 +44,7 @@ pub async fn rocket() -> _ {
         .attach(cors_fairing())
         .register("/", catchers![not_found])
         .configure(rocket::Config {
+            address: "0.0.0.0".parse().unwrap(),
             port: 8080,
             ..rocket::Config::default()
         });
