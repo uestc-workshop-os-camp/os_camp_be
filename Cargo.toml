@@ -17,4 +17,11 @@ base64 = "0.13"
 lazy_static = "1.5.0"
 dotenv = "0.15"
 chrono = "0.4.38"
+
+[features]
+default = ["rcore-camp-score","rcore-rustlings-score"]
+rcore-rustlings-score = []
+rcore-camp-score = []
+
 [build-dependencies]
+

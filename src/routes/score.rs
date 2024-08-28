@@ -1,4 +1,4 @@
-use crate::models::user_info::{page, UserInfo};
+use crate::models::user_info::{phase2_page, Phase2UserInfo};
 #[allow(unused_imports)]
 use diesel::mysql::MysqlConnection;
 use rocket::{
@@ -14,7 +14,7 @@ use serde::Serialize;
 struct Result {
     code: i32,                   // 0表示失败 1表示成功
     message: String,             //错误信息，可以为空
-    data: Option<Vec<UserInfo>>, // 排行榜信息
+    data: Option<Vec<Phase2UserInfo>>, // 排行榜信息
 }
 
 /**
@@ -26,7 +26,7 @@ struct Result {
 #[get("/scores/<offset>/<limit>/<mode>")]
 pub async fn get_scores(offset: i32, limit: i32, mode: i32) -> Json<Value> {
     let result: Json<Value> = match mode {
-        1 => match page(offset, limit) {
+        1 => match phase2_page(offset, limit) {
             Ok(users) => {
                 let response = Result {
                     code: 1,
