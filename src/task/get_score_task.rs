@@ -1,12 +1,17 @@
 use std::collections::HashMap;
-
+use lazy_static::lazy_static;
 use crate::models::user_info::{self, insert};
 use base64::decode;
 use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-const TOKEN: &str = "";
+// 使用 lazy_static 来延迟初始化 TOKEN
+lazy_static! {
+    static ref TOKEN: String = {
+        std::env::var("GITHUB_TOKEN").expect("github TOKEN must be set")
+    };
+}
 const ORGANIZER: &str = "uestc-workshop-os-camp";
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -32,7 +37,7 @@ struct JsonFile {
 pub async fn get_score() {
     use tokio::time::{interval, Duration};
 
-    let mut interval = interval(Duration::from_secs(3600)); // 1h
+    let mut interval = interval(Duration::from_secs(30)); // 30s
 
     // format url
     let url = format!("https://api.github.com/orgs/{}/repos", ORGANIZER);
@@ -40,13 +45,22 @@ pub async fn get_score() {
     let mut headers = header::HeaderMap::new();
     headers.insert(
         header::AUTHORIZATION,
-        header::HeaderValue::from_str(TOKEN).unwrap(),
+        header::HeaderValue::from_str(&TOKEN).unwrap(),
+    );
+    // 设置 user-agent 请求头
+    headers.insert(
+        header::USER_AGENT,
+        header::HeaderValue::from_static("reqwest"),
     );
     // Create a new HTTP client with the headers
     let client = Client::builder().default_headers(headers).build().unwrap();
+    // debug: 查看轮数
+    let mut round_count = 0;
 
     loop {
         interval.tick().await;
+        round_count += 1;
+        println!("Round: {}", round_count);
         // task
         // Send a GET request to the URL
         match client.get(&url).send().await {
@@ -61,8 +75,8 @@ pub async fn get_score() {
                             if let Some(username) = repo.name.strip_prefix("rcore-camp-") {
                                 // 格式化最新文件的 URL
                                 let latest_json_url = format!(
-                                    "https://api.github.com/repos/{}/{}/contents/latest.json",
-                                    username, repo.name
+                                    "https://api.github.com/repos/{}/{}/contents/latest.json?ref=gh-pages",
+                                    ORGANIZER, repo.name
                                 );
 
                                 match client.get(&latest_json_url).send().await {
@@ -71,8 +85,17 @@ pub async fn get_score() {
                                             let latest_json_file: JsonFile =
                                                 response.json().await.unwrap();
                                             // 解码 Base64 字符串
+                                            // 预处理，去掉换行符
+                                            let latest_json_file_content =
+                                                latest_json_file.content.replace("\n", "");
                                             let decoded_bytes =
-                                                decode(&latest_json_file.content).unwrap();
+                                                match decode(&latest_json_file_content) {
+                                                    Ok(decode) => decode,
+                                                    Err(err) => {
+                                                        eprintln!("Failed to decode: {}", err);
+                                                        continue;
+                                                    }
+                                                };
 
                                             // 将解码后的字节序列转换为字符串
                                             let decoded_str =
@@ -89,7 +112,10 @@ pub async fn get_score() {
                                                 let mut user_info = user_info::UserInfo::new();
 
                                                 for (key, value) in &data {
-                                                    let score_file_url = format!("https://api.github.com/repos/{}/{}/contents/{}",username,repo.name,value);
+                                                    // 预处理，去掉key和value包裹的引号
+                                                    let key = key.replace("\"", "");
+                                                    let value = value.to_string().replace("\"", "");
+                                                    let score_file_url = format!("https://api.github.com/repos/{}/{}/contents/{}?ref=gh-pages",ORGANIZER,repo.name,value);
 
                                                     match client.get(&score_file_url).send().await {
                                                         Ok(res) => {
@@ -134,23 +160,18 @@ pub async fn get_score() {
                                                                     * 100.0;
 
                                                                 match key.as_str() {
-                                                                    "ch3" => {
-                                                                        user_info.ch3 = score
-                                                                    }
-                                                                    "ch4" => {
-                                                                        user_info.ch4 = score
-                                                                    }
-                                                                    "ch5" => {
-                                                                        user_info.ch5 = score
-                                                                    }
-                                                                    "ch6" => {
-                                                                        user_info.ch6 = score
-                                                                    }
-                                                                    "ch8" => {
-                                                                        user_info.ch8 = score
-                                                                    }
+                                                                    "ch3" => user_info.ch3 = score,
+                                                                    "ch4" => user_info.ch4 = score,
+                                                                    "ch5" => user_info.ch5 = score,
+                                                                    "ch6" => user_info.ch6 = score,
+                                                                    "ch8" => user_info.ch8 = score,
                                                                     _ => (),
                                                                 }
+                                                            } else {
+                                                                eprintln!(
+                                                                    "Failed to fetch json file: {}",
+                                                                    res.text().await.unwrap()
+                                                                );
                                                             }
                                                         }
                                                         Err(err) => {
@@ -158,7 +179,6 @@ pub async fn get_score() {
                                                         }
                                                     }
                                                 }
-                                                user_info.username = username.to_string();
                                                 // 通过 github rest api 由用户名称获取用户信息
                                                 let github_user_info_url = format!(
                                                     "https://api.github.com/users/{}",
@@ -190,14 +210,21 @@ pub async fn get_score() {
                                                         "".to_string()
                                                     }
                                                 };
+                                                user_info.username = username.to_string();
+                                                // 因为是阶段2，所以id为2
+                                                user_info.id = 2;
                                                 println!("{:?}", user_info);
                                                 // 插入数据库
-                                                if let Err(e) =
-                                                    insert(&user_info)
-                                                {
+                                                if let Err(e) = insert(&user_info) {
                                                     eprintln!("Failed to insert data: {:?}", e);
                                                 }
                                             }
+                                        } else if response.status().as_u16() != 404 {
+                                            // 这种情况下，不可能是因为 gh-pages 分支没有 latest.json 文件，不可以接受
+                                            eprintln!(
+                                                "Failed to fetch latest json file: {}",
+                                                response.text().await.unwrap()
+                                            );
                                         }
                                     }
                                     Err(err) => {

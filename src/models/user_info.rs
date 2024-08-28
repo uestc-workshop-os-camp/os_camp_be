@@ -3,7 +3,7 @@ use crate::config::database::conn_poll;
 use diesel::{
     dsl::{insert_into, sum},
     prelude::{Insertable, Queryable},
-    ExpressionMethods, QueryDsl, RunQueryDsl
+    ExpressionMethods, QueryDsl, RunQueryDsl,
 };
 use serde::{Deserialize, Serialize};
 
@@ -54,6 +54,18 @@ pub fn insert(user_info_: &UserInfo) -> Result<(), diesel::result::Error> {
     use crate::schema::user_info::dsl::*;
 
     let conn = &mut conn_poll.get().unwrap();
-    insert_into(user_info).values(user_info_).execute(conn)?;
+    // 如果主键（id、username）冲突则更新
+    insert_into(user_info)
+        .values(user_info_)
+        .on_conflict(diesel::dsl::DuplicatedKeys)
+        .do_update()
+        .set((
+            ch3.eq(user_info_.ch3),
+            ch4.eq(user_info_.ch4),
+            ch5.eq(user_info_.ch5),
+            ch6.eq(user_info_.ch6),
+            ch8.eq(user_info_.ch8),
+        ))
+        .execute(conn)?;
     Ok(())
 }
