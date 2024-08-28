@@ -41,8 +41,9 @@ struct JsonFile {
  */
 pub async fn get_score() {
     use tokio::time::{interval, Duration};
-
-    let mut interval = interval(Duration::from_secs(30)); // 30s
+    // 从环境变量中获取 delay时间, 默认为30s，将字符串转换为u64
+    let delay = std::env::var("DELAY").unwrap_or("30".to_string()).parse::<u64>().unwrap();
+    let mut interval = interval(Duration::from_secs(delay));
 
     // format url
     let url = format!("https://api.github.com/orgs/{}/repos", ORGANIZER);

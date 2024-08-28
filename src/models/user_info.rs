@@ -8,6 +8,7 @@ use diesel::{
 };
 use serde::{Deserialize, Serialize};
 
+
 #[derive(Debug, Deserialize, Serialize, Queryable, Insertable)]
 #[diesel(table_name = phase2_user_info)]
 #[serde(crate = "rocket::serde")]
@@ -66,6 +67,20 @@ impl Phase1UserInfo {
             pass_time: i64::MAX,
         }
     }
+}
+
+pub fn phase1_page(offset: i32, limit: i32) -> Result<Vec<Phase1UserInfo>, diesel::result::Error> {
+    use crate::schema::phase1_user_info::dsl::*;
+
+    let conn = &mut conn_poll.get().unwrap();
+    let results = phase1_user_info
+        .order_by(points.desc()) // 按总成绩降序排列
+        .then_order_by(pass_time.asc()) // 然后按通过时间升序排列
+        .limit(limit.into())
+        .offset(offset.into())
+        .load::<Phase1UserInfo>(conn)?;
+
+    Ok(results)
 }
 
 pub fn phase2_page(offset: i32, limit: i32) -> Result<Vec<Phase2UserInfo>, diesel::result::Error> {

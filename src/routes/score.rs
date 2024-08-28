@@ -1,4 +1,4 @@
-use crate::models::user_info::{phase2_page, Phase2UserInfo};
+use crate::models::user_info::{phase1_page, phase2_page, Phase2UserInfo};
 #[allow(unused_imports)]
 use diesel::mysql::MysqlConnection;
 use rocket::{
@@ -11,10 +11,10 @@ use serde::Serialize;
  * 返回结果的结构体
  */
 #[derive(Debug, Serialize)]
-struct Result {
-    code: i32,                   // 0表示失败 1表示成功
-    message: String,             //错误信息，可以为空
-    data: Option<Vec<Phase2UserInfo>>, // 排行榜信息
+struct Result<T> {
+    code: i32,                         // 400表示失败 200表示成功
+    message: String,                   //错误信息，可以为空
+    data: Option<Vec<T>>, // 排行榜信息
 }
 
 /**
@@ -29,32 +29,41 @@ pub async fn get_scores(offset: i32, limit: i32, mode: i32) -> Json<Value> {
         1 => match phase2_page(offset, limit) {
             Ok(users) => {
                 let response = Result {
-                    code: 1,
+                    code: 200,
                     message: String::new(),
                     data: Some(users),
                 };
                 Json(serde_json::json!(response))
             }
             Err(err) => {
-                let response = Result {
-                    code: 0,
+                let response:Result<Phase2UserInfo> = Result {
+                    code: 400,
                     message: format!("数据库错误: {}", err),
                     data: None,
                 };
                 Json(serde_json::json!(response))
             }
         },
-        2 => {
-            // wait to impl
-            let response = Result {
-                code: 1,
-                message: "模式 2 尚未实现".to_string(),
-                data: None,
-            };
-            Json(serde_json::json!(response))
-        }
+        2 => match phase1_page(offset, limit) {
+            Ok(users) => {
+                let response = Result {
+                    code: 200,
+                    message: String::new(),
+                    data: Some(users),
+                };
+                Json(serde_json::json!(response))
+            }
+            Err(err) => {
+                let response:Result<Phase2UserInfo> = Result {
+                    code: 400,
+                    message: format!("数据库错误: {}", err),
+                    data: None,
+                };
+                Json(serde_json::json!(response))
+            }
+        },
         _ => {
-            let response = Result {
+            let response:Result<()> = Result {
                 code: 0,
                 message: "无效的模式".to_string(),
                 data: None,
