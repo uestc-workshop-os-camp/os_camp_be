@@ -1,18 +1,22 @@
-use std::collections::HashMap;
-use lazy_static::lazy_static;
 use crate::models::user_info::{self, insert};
 use base64::decode;
+use chrono::{FixedOffset, NaiveDateTime};
+use lazy_static::lazy_static;
 use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 
 // 使用 lazy_static 来延迟初始化 TOKEN
 lazy_static! {
     static ref TOKEN: String = {
-        std::env::var("GITHUB_TOKEN").expect("github TOKEN must be set")
+        "Bearer ".to_string() + &std::env::var("GITHUB_TOKEN").expect("github TOKEN must be set")
     };
 }
 const ORGANIZER: &str = "uestc-workshop-os-camp";
+const TIME_FORMAT: &str = "%Y_%m_%d_%H_%M_%S";
+const HOUR: i32 = 3600;
+const ZONE: i32 = 0;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Repo {
@@ -47,6 +51,8 @@ pub async fn get_score() {
         header::AUTHORIZATION,
         header::HeaderValue::from_str(&TOKEN).unwrap(),
     );
+    // debug 打印 TOKEN
+    println!("TOKEN: {}", *TOKEN);
     // 设置 user-agent 请求头
     headers.insert(
         header::USER_AGENT,
@@ -110,11 +116,39 @@ pub async fn get_score() {
                                                     map.into_iter().collect();
 
                                                 let mut user_info = user_info::UserInfo::new();
+                                                let mut timestamp = 0;
 
                                                 for (key, value) in &data {
                                                     // 预处理，去掉key和value包裹的引号
                                                     let key = key.replace("\"", "");
                                                     let value = value.to_string().replace("\"", "");
+                                                    // 将value的.txt去掉,得到文件名，格式为2024_08_20_09_11_05, 2024年8月20日9点11分05秒,从而转换为时间戳
+                                                    let time = value.replace(".txt", "");
+                                                    // 将时间戳转换为时间
+                                                    timestamp = match NaiveDateTime::parse_from_str(
+                                                        &time,
+                                                        TIME_FORMAT,
+                                                    ) {
+                                                        Ok(time) => {
+
+                                                            let tz = FixedOffset::east_opt(ZONE * HOUR).unwrap();
+                                                            // 返回最老的时间戳
+                                                            let tmp = time.and_local_timezone(tz).unwrap().timestamp();
+                                                            if tmp < timestamp {
+                                                                timestamp
+                                                            } else {
+                                                                tmp
+                                                            }
+                                                        }
+                                                        Err(err) => {
+                                                            eprintln!(
+                                                                "Failed to parse time: {}",
+                                                                err
+                                                            );
+                                                            continue;
+                                                        }
+                                                    };
+
                                                     let score_file_url = format!("https://api.github.com/repos/{}/{}/contents/{}?ref=gh-pages",ORGANIZER,repo.name,value);
 
                                                     match client.get(&score_file_url).send().await {
@@ -213,6 +247,14 @@ pub async fn get_score() {
                                                 user_info.username = username.to_string();
                                                 // 因为是阶段2，所以id为2
                                                 user_info.id = 2;
+                                                user_info.pass_time = timestamp;
+                                                // 算总分
+                                                user_info.total = user_info.ch3
+                                                    + user_info.ch4
+                                                    + user_info.ch5
+                                                    + user_info.ch6
+                                                    + user_info.ch8;
+                                                // debug 打印用户信息
                                                 println!("{:?}", user_info);
                                                 // 插入数据库
                                                 if let Err(e) = insert(&user_info) {
@@ -235,7 +277,7 @@ pub async fn get_score() {
                         }
                     }
                 } else {
-                    eprintln!("Failed to fetch repos: {}", response.status());
+                    eprintln!("send success butFailed to fetch repos: {}", response.status());
                 }
             }
             Err(err) => {

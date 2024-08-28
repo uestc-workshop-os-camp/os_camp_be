@@ -42,7 +42,11 @@ pub async fn rocket() -> _ {
     let rocket = rocket::build()
         .mount("/api", routes![get_scores])
         .attach(cors_fairing())
-        .register("/", catchers![not_found]);
+        .register("/", catchers![not_found])
+        .configure(rocket::Config {
+            port: 8080,
+            ..rocket::Config::default()
+        });
 
     // 启动定时任务
     rocket::tokio::spawn(async {

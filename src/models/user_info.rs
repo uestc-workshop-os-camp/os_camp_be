@@ -1,7 +1,7 @@
 use super::super::schema::user_info;
 use crate::config::database::conn_poll;
 use diesel::{
-    dsl::{insert_into, sum},
+    dsl::insert_into,
     prelude::{Insertable, Queryable},
     ExpressionMethods, QueryDsl, RunQueryDsl,
 };
@@ -20,6 +20,8 @@ pub struct UserInfo {
     pub ch5: f64,
     pub ch6: f64,
     pub ch8: f64,
+    pub total: f64,
+    pub pass_time: i64,
 }
 
 impl UserInfo {
@@ -33,6 +35,8 @@ impl UserInfo {
             ch5: 0.0,
             ch6: 0.0,
             ch8: 0.0,
+            total: 0.0,
+            pass_time: i64::MAX,
         }
     }
 }
@@ -42,7 +46,8 @@ pub fn page(offset: i32, limit: i32) -> Result<Vec<UserInfo>, diesel::result::Er
 
     let conn = &mut conn_poll.get().unwrap();
     let results = user_info
-        .order_by(sum(ch3 + ch4 + ch5 + ch6 + ch8).desc()) // 按总成绩降序排列
+        .order_by(total.desc()) // 按总成绩降序排列
+        .then_order_by(pass_time.asc()) // 然后按通过时间升序排列
         .limit(limit.into())
         .offset(offset.into())
         .load::<UserInfo>(conn)?;
@@ -65,6 +70,8 @@ pub fn insert(user_info_: &UserInfo) -> Result<(), diesel::result::Error> {
             ch5.eq(user_info_.ch5),
             ch6.eq(user_info_.ch6),
             ch8.eq(user_info_.ch8),
+            total.eq(user_info_.total),
+            pass_time.eq(user_info_.pass_time),
         ))
         .execute(conn)?;
     Ok(())
