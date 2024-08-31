@@ -1,5 +1,5 @@
 /target
-!target/release/os_web
+!/target/release/os_web
 Cargo.lock
 private*
 .env
