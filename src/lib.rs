@@ -38,14 +38,17 @@ fn cors_fairing() -> Cors {
 // by noah: maybe non-async
 #[launch]
 pub async fn rocket() -> _ {
+    // 从环境变量中加载配置
+    let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+    let address = std::env::var("ADDRESS").unwrap_or_else(|_| "0.0.0.0".to_string());
     // 创建 Rocket 实例
     let rocket = rocket::build()
         .mount("/api", routes![get_scores])
         .attach(cors_fairing())
         .register("/", catchers![not_found])
         .configure(rocket::Config {
-            address: "0.0.0.0".parse().unwrap(),
-            port: 8080,
+            address: address.parse().unwrap(),
+            port: port.parse().unwrap(),
             ..rocket::Config::default()
         });
 
