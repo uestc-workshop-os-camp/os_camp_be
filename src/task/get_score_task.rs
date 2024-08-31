@@ -40,9 +40,8 @@ pub async fn get_score() {
         .parse::<u64>()
         .unwrap();
     let mut interval = interval(Duration::from_secs(delay));
-    let token: String = {
-        "Bearer ".to_string() + &std::env::var("GITHUB_TOKEN").expect("github TOKEN must be set")
-    };
+    let token: String = std::env::var("PERSONAL_GITHUB_TOKEN").expect("github TOKEN must be set");
+    let token = "Bearer ".to_string() + &token;
     // format url
     let url = format!("https://api.github.com/orgs/{}/repos", ORGANIZER);
     // set header
