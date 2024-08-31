@@ -2,18 +2,11 @@ use crate::models::user_info::{self, phase1_insert, phase2_insert};
 use crate::models::user_info::{Phase1UserInfo, Phase2UserInfo};
 use base64::decode;
 use chrono::{FixedOffset, NaiveDateTime};
-use lazy_static::lazy_static;
 use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
-// 使用 lazy_static 来延迟初始化 TOKEN
-lazy_static! {
-    static ref TOKEN: String = {
-        "Bearer ".to_string() + &std::env::var("GITHUB_TOKEN").expect("github TOKEN must be set")
-    };
-}
 const ORGANIZER: &str = "uestc-workshop-os-camp";
 const TIME_FORMAT: &str = "%Y_%m_%d_%H_%M_%S";
 const HOUR: i32 = 3600;
@@ -42,19 +35,24 @@ struct JsonFile {
 pub async fn get_score() {
     use tokio::time::{interval, Duration};
     // 从环境变量中获取 delay时间, 默认为30s，将字符串转换为u64
-    let delay = std::env::var("DELAY").unwrap_or("30".to_string()).parse::<u64>().unwrap();
+    let delay = std::env::var("DELAY")
+        .unwrap_or("30".to_string())
+        .parse::<u64>()
+        .unwrap();
     let mut interval = interval(Duration::from_secs(delay));
-
+    let token: String = {
+        "Bearer ".to_string() + &std::env::var("GITHUB_TOKEN").expect("github TOKEN must be set")
+    };
     // format url
     let url = format!("https://api.github.com/orgs/{}/repos", ORGANIZER);
     // set header
     let mut headers = header::HeaderMap::new();
     headers.insert(
         header::AUTHORIZATION,
-        header::HeaderValue::from_str(&TOKEN).unwrap(),
+        header::HeaderValue::from_str(&token).unwrap(),
     );
     // debug 打印 TOKEN
-    println!("TOKEN: {}", *TOKEN);
+    println!("TOKEN: {}", token);
     // 设置 user-agent 请求头
     headers.insert(
         header::USER_AGENT,
@@ -289,10 +287,7 @@ async fn insert_score_info(repo: Repo, client: &Client) {
  * 获取 rcore-rustlings- 仓库的分数
  */
 #[cfg(feature = "rcore-rustlings-score")]
-fn phase1_rcore_rustring_score(
-    phase1_user_info: &mut Phase1UserInfo,
-    decoded_string: &String,
-) {
+fn phase1_rcore_rustring_score(phase1_user_info: &mut Phase1UserInfo, decoded_string: &String) {
     //获取以Points: 开头的行
     let points_line = decoded_string
         .lines()
