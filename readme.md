@@ -7,4 +7,5 @@ PERSONAL_GITHUB_TOKEN=`your personal access token of github`
 DELAY=`the poll delay time of server, in seconds. e.g. val set 3600 means 1 hour`
 PORT=`the port of the server`
 ADDRESS=`the listening address of the server`
+DEFAULT_HAND_TIME=`the default question hand in time`
 ```
