@@ -11,6 +11,9 @@ const ORGANIZER: &str = "uestc-workshop-os-camp";
 const TIME_FORMAT: &str = "%Y_%m_%d_%H_%M_%S";
 const HOUR: i32 = 3600;
 const ZONE: i32 = 8;
+lazy_static::lazy_static!(
+    pub static ref DEFAULT_TIME:i64 = std::env::var("DEFAULT_HAND_TIME").unwrap_or("1725174292".to_string()).parse::<i64>().unwrap();
+);
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Repo {
@@ -214,27 +217,7 @@ async fn insert_score_info(repo: Repo, client: &Client) {
                             }
                         }
                         // 通过 github rest api 由用户名称获取用户信息
-                        let github_user_info_url =
-                            format!("https://api.github.com/users/{}", username);
-                        let github_user_header_url =
-                            match client.get(&github_user_info_url).send().await {
-                                Ok(res) => {
-                                    if res.status().is_success() {
-                                        //解析json
-                                        let user_info: Owner = res.json().await.unwrap();
-                                        // debug 打印 用户信息
-                                        println!("{:?}", user_info);
-                                        // 返回json中有avatar_url
-                                        user_info.avatar_url
-                                    } else {
-                                        "".to_string()
-                                    }
-                                }
-                                Err(err) => {
-                                    eprintln!("Failed to fetch user info: {}", err);
-                                    "".to_string()
-                                }
-                            };
+                        let github_user_header_url = get_user_header_url(&username, client).await;
                         #[cfg(feature = "rcore-camp-score")]
                         if phase == 2 {
                             phase2_user_info.header_url = github_user_header_url.clone();
@@ -273,6 +256,41 @@ async fn insert_score_info(repo: Repo, client: &Client) {
                         "Failed to fetch latest json file: {}",
                         response.text().await.unwrap()
                     );
+                } else {
+                    // 404 Not Found的情况，插入全0分数
+                    #[cfg(feature = "rcore-camp-score")]
+                    if let Some(_username) = repo.name.strip_prefix("rcore-camp-") {
+                        let mut phase2_user_info = user_info::Phase2UserInfo::new();
+                        phase2_user_info.username = _username.to_string();
+                        phase2_user_info.ch3 = 0.0;
+                        phase2_user_info.ch4 = 0.0;
+                        phase2_user_info.ch5 = 0.0;
+                        phase2_user_info.ch6 = 0.0;
+                        phase2_user_info.ch8 = 0.0;
+                        phase2_user_info.total = 0.0;
+                        phase2_user_info.pass_time = DEFAULT_TIME.clone();
+                        phase2_user_info.header_url = get_user_header_url(_username, client).await;
+                        // debug 打印用户信息
+                        println!("{:?}", phase2_user_info);
+                        if let Err(e) = phase2_insert(&phase2_user_info) {
+                            eprintln!("Failed to insert data: {:?}", e);
+                        }
+                    }
+
+                    #[cfg(feature = "rcore-rustlings-score")]
+                    if let Some(_username) = repo.name.strip_prefix("rcore-rustlings-") {
+                        let mut phase1_user_info = user_info::Phase1UserInfo::new();
+                        phase1_user_info.username = _username.to_string();
+                        phase1_user_info.points = 0.0;
+                        phase1_user_info.total = 0.0;
+                        phase1_user_info.pass_time = DEFAULT_TIME.clone();
+                        phase1_user_info.header_url = get_user_header_url(_username, client).await;
+                        // debug 打印用户信息
+                        println!("{:?}", phase1_user_info);
+                        if let Err(e) = phase1_insert(&phase1_user_info) {
+                            eprintln!("Failed to insert data: {:?}", e);
+                        }
+                    }
                 }
             }
             Err(err) => {
@@ -327,5 +345,32 @@ fn phase2_rcore_camp_score(
         "ch6" => phase2_user_info.ch6 = score,
         "ch8" => phase2_user_info.ch8 = score,
         _ => (),
+    }
+}
+
+/**
+ * 获取用户头像
+ */
+
+async fn get_user_header_url(username: &str, client: &Client) -> String {
+    // 通过 github rest api 由用户名称获取用户信息
+    let github_user_info_url = format!("https://api.github.com/users/{}", username);
+    match client.get(&github_user_info_url).send().await {
+        Ok(res) => {
+            if res.status().is_success() {
+                //解析json
+                let user_info: Owner = res.json().await.unwrap();
+                // debug 打印 用户信息
+                println!("{:?}", user_info);
+                // 返回json中有avatar_url
+                user_info.avatar_url
+            } else {
+                "".to_string()
+            }
+        }
+        Err(err) => {
+            eprintln!("Failed to fetch user info: {}", err);
+            "".to_string()
+        }
     }
 }
