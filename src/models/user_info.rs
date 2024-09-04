@@ -68,8 +68,13 @@ impl Phase1UserInfo {
         }
     }
 }
+#[derive(Debug, Serialize)]
+pub struct UserInfo<T> {
+    phase_user_info: T,
+    rank: i32,
+}
 
-pub fn phase1_page(offset: i32, limit: i32) -> Result<Vec<Phase1UserInfo>, diesel::result::Error> {
+pub fn phase1_page(offset: i32, limit: i32) -> Result<Vec<UserInfo<Phase1UserInfo>>, diesel::result::Error> {
     use crate::schema::phase1_user_info::dsl::*;
 
     let conn = &mut conn_poll.get().unwrap();
@@ -79,11 +84,17 @@ pub fn phase1_page(offset: i32, limit: i32) -> Result<Vec<Phase1UserInfo>, diese
         .limit(limit.into())
         .offset(offset.into())
         .load::<Phase1UserInfo>(conn)?;
-
-    Ok(results)
+    let mut result_infos:Vec<UserInfo<Phase1UserInfo>> = Vec::new();
+    for (i, user) in results.into_iter().enumerate() {
+        result_infos.push(UserInfo {
+            phase_user_info: user,
+            rank: (offset + i as i32 + 1),
+        });
+    }
+    Ok(result_infos)
 }
 
-pub fn phase2_page(offset: i32, limit: i32) -> Result<Vec<Phase2UserInfo>, diesel::result::Error> {
+pub fn phase2_page(offset: i32, limit: i32) -> Result<Vec<UserInfo<Phase2UserInfo>>, diesel::result::Error> {
     use crate::schema::phase2_user_info::dsl::*;
 
     let conn = &mut conn_poll.get().unwrap();
@@ -93,8 +104,14 @@ pub fn phase2_page(offset: i32, limit: i32) -> Result<Vec<Phase2UserInfo>, diese
         .limit(limit.into())
         .offset(offset.into())
         .load::<Phase2UserInfo>(conn)?;
-
-    Ok(results)
+    let mut result_infos:Vec<UserInfo<Phase2UserInfo>> = Vec::new();
+    for (i, user) in results.into_iter().enumerate() {
+        result_infos.push(UserInfo {
+            phase_user_info: user,
+            rank: (offset + i as i32 + 1),
+        });
+    }
+    Ok(result_infos)
 }
 
 pub fn phase2_insert(user_info_: &Phase2UserInfo) -> Result<(), diesel::result::Error> {
