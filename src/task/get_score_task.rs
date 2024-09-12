@@ -45,8 +45,6 @@ pub async fn get_score() {
     let mut interval = interval(Duration::from_secs(delay));
     let token: String = std::env::var("PERSONAL_GITHUB_TOKEN").expect("github TOKEN must be set");
     let token = "Bearer ".to_string() + &token;
-    // format url
-    let url = format!("https://api.github.com/orgs/{}/repos", ORGANIZER);
     // set header
     let mut headers = header::HeaderMap::new();
     headers.insert(
@@ -69,30 +67,49 @@ pub async fn get_score() {
         interval.tick().await;
         round_count += 1;
         println!("Round: {}", round_count);
+        // format url
+        let mut page = 1;
+        let mut url = format!(
+            "https://api.github.com/orgs/{}/repos?per_page=100&page={}",
+            ORGANIZER, page
+        );
         // task
         // Send a GET request to the URL
-        match client.get(&url).send().await {
-            Ok(response) => {
-                if response.status().is_success() {
-                    // 解析 JSON 响应
-                    let repos: Vec<Repo> = response.json().await.unwrap();
-                    for repo in repos {
-                        #[cfg(any(
-                            feature = "rcore-camp-score",
-                            feature = "rcore-rustlings-score"
-                        ))]
-                        insert_score_info(repo, &client).await;
+        loop {
+            match client.get(&url).send().await {
+                Ok(response) => {
+                    if response.status().is_success() {
+                        // 如果内容为空，则退出循环
+                        if response.content_length().unwrap() == 2 {
+                            // debug 打印
+                            println!("No more repos");
+                            break;
+                        }
+                        // 解析 JSON 响应
+                        let repos: Vec<Repo> = response.json().await.unwrap();
+                        for repo in repos {
+                            #[cfg(any(
+                                feature = "rcore-camp-score",
+                                feature = "rcore-rustlings-score"
+                            ))]
+                            insert_score_info(repo, &client).await;
+                        }
+                    } else {
+                        eprintln!(
+                            "send success butFailed to fetch repos: {}",
+                            response.status()
+                        );
                     }
-                } else {
-                    eprintln!(
-                        "send success butFailed to fetch repos: {}",
-                        response.status()
-                    );
+                }
+                Err(err) => {
+                    eprintln!("Failed to fetch repos: {}", err);
                 }
             }
-            Err(err) => {
-                eprintln!("Failed to fetch repos: {}", err);
-            }
+            page += 1;
+            url = format!(
+                "https://api.github.com/orgs/{}/repos?per_page=100&page={}",
+                ORGANIZER, page
+            );
         }
     }
 }
@@ -104,6 +121,10 @@ async fn insert_score_info(repo: Repo, client: &Client) {
             "https://api.github.com/repos/{}/{}/contents/latest.json?ref=gh-pages",
             ORGANIZER, repo.name
         );
+        // debug 打印请求的url
+        // if repo.name.starts_with("rcore-camp-") {
+        //     println!("rcore-camp-: {}", latest_json_url);
+        // }
 
         match client.get(&latest_json_url).send().await {
             Ok(response) => {
