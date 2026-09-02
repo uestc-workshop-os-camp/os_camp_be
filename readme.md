@@ -1,4 +1,4 @@
-# UESTC OS Camp 2025 Backend
+# UESTC OS Camp 2026 Backend
 ## How to config
 - Create a file named `.env` in the root directory of the project.
 - Add the following content to the `.env` file:

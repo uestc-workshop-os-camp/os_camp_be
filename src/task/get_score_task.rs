@@ -115,14 +115,14 @@ pub async fn get_score() {
 }
 #[cfg(any(feature = "rcore-camp-score", feature = "rcore-rustlings-score"))]
 async fn insert_score_info(repo: Repo, client: &Client) {
-    if repo.name.starts_with("rcore-camp-2025-") || repo.name.starts_with("rcore-rustlings-2025-") {
+    if repo.name.starts_with("rcore-camp-2026-") || repo.name.starts_with("rcore-rustlings-2026-") {
         // 格式化最新文件的 URL
         let latest_json_url = format!(
             "https://api.github.com/repos/{}/{}/contents/latest.json?ref=gh-pages",
             ORGANIZER, repo.name
         );
         // debug 打印请求的url
-        // if repo.name.starts_with("rcore-camp-2025-") {
+        // if repo.name.starts_with("rcore-camp-2026-") {
         //     println!("rcore-camp-: {}", latest_json_url);
         // }
 
@@ -204,7 +204,7 @@ async fn insert_score_info(repo: Repo, client: &Client) {
                                         let decoded_string = String::from_utf8(decoded).unwrap();
                                         #[cfg(feature = "rcore-camp-score")]
                                         if let Some(_username) =
-                                            repo.name.strip_prefix("rcore-camp-2025-")
+                                            repo.name.strip_prefix("rcore-camp-2026-")
                                         {
                                             phase2_rcore_camp_score(
                                                 &mut phase2_user_info,
@@ -216,7 +216,7 @@ async fn insert_score_info(repo: Repo, client: &Client) {
                                         }
                                         #[cfg(feature = "rcore-rustlings-score")]
                                         if let Some(_username) =
-                                            repo.name.strip_prefix("rcore-rustlings-2025-")
+                                            repo.name.strip_prefix("rcore-rustlings-2026-")
                                         {
                                             phase1_rcore_rustring_score(
                                                 &mut phase1_user_info,
@@ -280,7 +280,7 @@ async fn insert_score_info(repo: Repo, client: &Client) {
                 } else {
                     // 404 Not Found的情况，插入全0分数
                     #[cfg(feature = "rcore-camp-score")]
-                    if let Some(_username) = repo.name.strip_prefix("rcore-camp-2025-") {
+                    if let Some(_username) = repo.name.strip_prefix("rcore-camp-2026-") {
                         let mut phase2_user_info = user_info::Phase2UserInfo::new();
                         phase2_user_info.username = _username.to_string();
                         phase2_user_info.ch3 = 0.0;
@@ -299,7 +299,7 @@ async fn insert_score_info(repo: Repo, client: &Client) {
                     }
 
                     #[cfg(feature = "rcore-rustlings-score")]
-                    if let Some(_username) = repo.name.strip_prefix("rcore-rustlings-2025-") {
+                    if let Some(_username) = repo.name.strip_prefix("rcore-rustlings-2026-") {
                         let mut phase1_user_info = user_info::Phase1UserInfo::new();
                         phase1_user_info.username = _username.to_string();
                         phase1_user_info.points = 0.0;
