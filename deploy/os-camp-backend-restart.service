@@ -1,0 +1,6 @@
+[Unit]
+Description=Restart Spark Initiative OS progress service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl restart os-camp-backend.service

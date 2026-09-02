@@ -1,13 +1,15 @@
 use super::super::schema::phase1_user_info;
 use super::super::schema::phase2_user_info;
-use crate::config::database::conn_poll;
+use crate::config::database::get_connection;
 use diesel::{
     dsl::insert_into,
     prelude::{Insertable, Queryable},
     ExpressionMethods, QueryDsl, RunQueryDsl,
 };
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 
+type ModelResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 
 #[derive(Debug, Deserialize, Serialize, Queryable, Insertable)]
 #[diesel(table_name = phase2_user_info)]
@@ -94,10 +96,10 @@ pub struct UserInfoPhase2 {
     rank: i32,
 }
 
-pub fn phase1_page(offset: i32, limit: i32) -> Result<Vec<UserInfoPhase1>, diesel::result::Error> {
+pub fn phase1_page(offset: i32, limit: i32) -> ModelResult<Vec<UserInfoPhase1>> {
     use crate::schema::phase1_user_info::dsl::*;
 
-    let conn = &mut conn_poll.get().unwrap();
+    let conn = &mut get_connection()?;
     let results = phase1_user_info
         .order_by(points.desc()) // 按总成绩降序排列
         .then_order_by(pass_time.asc()) // 然后按通过时间升序排列
@@ -119,10 +121,10 @@ pub fn phase1_page(offset: i32, limit: i32) -> Result<Vec<UserInfoPhase1>, diese
     Ok(result_infos)
 }
 
-pub fn phase2_page(offset: i32, limit: i32) -> Result<Vec<UserInfoPhase2>, diesel::result::Error> {
+pub fn phase2_page(offset: i32, limit: i32) -> ModelResult<Vec<UserInfoPhase2>> {
     use crate::schema::phase2_user_info::dsl::*;
 
-    let conn = &mut conn_poll.get().unwrap();
+    let conn = &mut get_connection()?;
     let results = phase2_user_info
         .order_by(total.desc()) // 按总成绩降序排列
         .then_order_by(pass_time.asc()) // 然后按通过时间升序排列
@@ -148,16 +150,17 @@ pub fn phase2_page(offset: i32, limit: i32) -> Result<Vec<UserInfoPhase2>, diese
     Ok(result_infos)
 }
 
-pub fn phase2_insert(user_info_: &Phase2UserInfo) -> Result<(), diesel::result::Error> {
+pub fn phase2_insert(user_info_: &Phase2UserInfo) -> ModelResult<()> {
     use crate::schema::phase2_user_info::dsl::*;
 
-    let conn = &mut conn_poll.get().unwrap();
+    let conn = &mut get_connection()?;
     // 如果主键（id、username）冲突则更新
     insert_into(phase2_user_info)
         .values(user_info_)
         .on_conflict(diesel::dsl::DuplicatedKeys)
         .do_update()
         .set((
+            header_url.eq(&user_info_.header_url),
             ch3.eq(user_info_.ch3),
             ch4.eq(user_info_.ch4),
             ch5.eq(user_info_.ch5),
@@ -170,16 +173,17 @@ pub fn phase2_insert(user_info_: &Phase2UserInfo) -> Result<(), diesel::result::
     Ok(())
 }
 
-pub fn phase1_insert(user_info_: &Phase1UserInfo) -> Result<(), diesel::result::Error> {
+pub fn phase1_insert(user_info_: &Phase1UserInfo) -> ModelResult<()> {
     use crate::schema::phase1_user_info::dsl::*;
 
-    let conn = &mut conn_poll.get().unwrap();
+    let conn = &mut get_connection()?;
     // 如果主键（id、username）冲突则更新
     insert_into(phase1_user_info)
         .values(user_info_)
         .on_conflict(diesel::dsl::DuplicatedKeys)
         .do_update()
         .set((
+            header_url.eq(&user_info_.header_url),
             points.eq(user_info_.points),
             total.eq(user_info_.total),
             pass_time.eq(user_info_.pass_time),

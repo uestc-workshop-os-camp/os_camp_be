@@ -1,4 +1,5 @@
 use crate::models::user_info::{phase1_page, phase2_page, Phase2UserInfo};
+use crate::task::get_score_task::{last_updated_at, refresh_interval_seconds};
 #[allow(unused_imports)]
 use diesel::mysql::MysqlConnection;
 use rocket::{
@@ -12,9 +13,11 @@ use serde::Serialize;
  */
 #[derive(Debug, Serialize)]
 struct Result<T> {
-    code: i32,            // 400表示失败 200表示成功
-    message: String,      //错误信息，可以为空
-    data: Option<Vec<T>>, // 排行榜信息
+    code: i32,                     // 400表示失败 200表示成功
+    message: String,               //错误信息，可以为空
+    data: Option<Vec<T>>,          //排行榜信息
+    updated_at: Option<i64>,       //最近一次完成刷新的时间
+    refresh_interval_seconds: u64, //自动刷新间隔
 }
 
 /**
@@ -33,6 +36,8 @@ pub async fn get_scores(offset: i32, limit: i32, mode: i32) -> Json<Value> {
                     code: 200,
                     message: String::new(),
                     data: Some(users),
+                    updated_at: last_updated_at(),
+                    refresh_interval_seconds: refresh_interval_seconds(),
                 };
                 Json(serde_json::json!(response))
             }
@@ -41,6 +46,8 @@ pub async fn get_scores(offset: i32, limit: i32, mode: i32) -> Json<Value> {
                     code: 400,
                     message: format!("数据库错误: {}", err),
                     data: None,
+                    updated_at: last_updated_at(),
+                    refresh_interval_seconds: refresh_interval_seconds(),
                 };
                 Json(serde_json::json!(response))
             }
@@ -51,6 +58,8 @@ pub async fn get_scores(offset: i32, limit: i32, mode: i32) -> Json<Value> {
                     code: 200,
                     message: String::new(),
                     data: Some(users),
+                    updated_at: last_updated_at(),
+                    refresh_interval_seconds: refresh_interval_seconds(),
                 };
                 Json(serde_json::json!(response))
             }
@@ -59,6 +68,8 @@ pub async fn get_scores(offset: i32, limit: i32, mode: i32) -> Json<Value> {
                     code: 400,
                     message: format!("数据库错误: {}", err),
                     data: None,
+                    updated_at: last_updated_at(),
+                    refresh_interval_seconds: refresh_interval_seconds(),
                 };
                 Json(serde_json::json!(response))
             }
@@ -68,6 +79,8 @@ pub async fn get_scores(offset: i32, limit: i32, mode: i32) -> Json<Value> {
                 code: 0,
                 message: "无效的模式".to_string(),
                 data: None,
+                updated_at: last_updated_at(),
+                refresh_interval_seconds: refresh_interval_seconds(),
             };
             Json(serde_json::json!(response))
         }
