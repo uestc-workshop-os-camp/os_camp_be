@@ -51,8 +51,6 @@ pub async fn get_score() {
         header::AUTHORIZATION,
         header::HeaderValue::from_str(&token).unwrap(),
     );
-    // debug 打印 TOKEN
-    println!("TOKEN: {}", token);
     // 设置 user-agent 请求头
     headers.insert(
         header::USER_AGENT,
