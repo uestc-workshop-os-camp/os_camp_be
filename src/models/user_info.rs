@@ -3,7 +3,7 @@ use super::super::schema::phase2_user_info;
 use crate::config::database::get_connection;
 use diesel::{
     dsl::insert_into,
-    prelude::{Insertable, Queryable},
+    prelude::{Connection, Insertable, Queryable},
     ExpressionMethods, QueryDsl, RunQueryDsl,
 };
 use serde::{Deserialize, Serialize};
@@ -190,4 +190,35 @@ pub fn phase1_insert(user_info_: &Phase1UserInfo) -> ModelResult<()> {
         ))
         .execute(conn)?;
     Ok(())
+}
+
+/// Remove scores whose source repository no longer exists.
+///
+/// Both phase tables are pruned in one transaction so a refresh can never
+/// expose a snapshot where only one phase has been reconciled.
+pub fn prune_absent_users(
+    rustlings_users: &[String],
+    rcore_users: &[String],
+) -> ModelResult<(usize, usize)> {
+    let conn = &mut get_connection()?;
+    let removed = conn.transaction::<_, diesel::result::Error, _>(|conn| {
+        let rustlings_removed = if cfg!(feature = "rcore-rustlings-score") {
+            use crate::schema::phase1_user_info::dsl::*;
+            diesel::delete(phase1_user_info.filter(username.ne_all(rustlings_users.to_vec())))
+                .execute(conn)?
+        } else {
+            0
+        };
+
+        let rcore_removed = if cfg!(feature = "rcore-camp-score") {
+            use crate::schema::phase2_user_info::dsl::*;
+            diesel::delete(phase2_user_info.filter(username.ne_all(rcore_users.to_vec())))
+                .execute(conn)?
+        } else {
+            0
+        };
+
+        Ok((rustlings_removed, rcore_removed))
+    })?;
+    Ok(removed)
 }

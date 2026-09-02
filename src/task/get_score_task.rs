@@ -1,10 +1,12 @@
-use crate::models::user_info::{phase1_insert, phase2_insert, Phase1UserInfo, Phase2UserInfo};
+use crate::models::user_info::{
+    phase1_insert, phase2_insert, prune_absent_users, Phase1UserInfo, Phase2UserInfo,
+};
 use base64::decode;
 use chrono::{FixedOffset, NaiveDateTime, Utc};
 use reqwest::{header, Client, StatusCode};
 use serde::Deserialize;
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::Duration;
 
@@ -47,6 +49,36 @@ struct JsonFile {
 enum ScorePhase {
     Rustlings,
     RCore,
+}
+
+#[derive(Default)]
+struct ActiveScoreUsers {
+    rustlings: HashSet<String>,
+    rcore: HashSet<String>,
+}
+
+impl ActiveScoreUsers {
+    fn record_repository(&mut self, repo_name: &str) -> bool {
+        match score_phase(repo_name) {
+            Some((ScorePhase::Rustlings, username)) => {
+                self.rustlings.insert(username.to_string());
+                true
+            }
+            Some((ScorePhase::RCore, username)) => {
+                self.rcore.insert(username.to_string());
+                true
+            }
+            None => false,
+        }
+    }
+
+    fn into_sorted(self) -> (Vec<String>, Vec<String>) {
+        let mut rustlings = self.rustlings.into_iter().collect::<Vec<_>>();
+        let mut rcore = self.rcore.into_iter().collect::<Vec<_>>();
+        rustlings.sort_unstable();
+        rcore.sort_unstable();
+        (rustlings, rcore)
+    }
 }
 
 pub fn last_updated_at() -> Option<i64> {
@@ -148,6 +180,7 @@ pub async fn get_score() {
 async fn refresh_scores(client: &Client) -> TaskResult<usize> {
     let mut page = 1;
     let mut failed_repositories = 0;
+    let mut active_users = ActiveScoreUsers::default();
 
     loop {
         let repos = fetch_repositories(client, page).await?;
@@ -156,7 +189,7 @@ async fn refresh_scores(client: &Client) -> TaskResult<usize> {
         }
 
         for repo in repos {
-            if score_phase(&repo.name).is_none() {
+            if !active_users.record_repository(&repo.name) {
                 continue;
             }
             if let Err(error) = insert_score_info(repo, client).await {
@@ -166,6 +199,16 @@ async fn refresh_scores(client: &Client) -> TaskResult<usize> {
         }
 
         page += 1;
+    }
+
+    let (rustlings_users, rcore_users) = active_users.into_sorted();
+    let (removed_rustlings, removed_rcore) =
+        prune_absent_users(&rustlings_users, &rcore_users)
+            .map_err(|error| format!("failed to remove stale scores: {error}"))?;
+    if removed_rustlings > 0 || removed_rcore > 0 {
+        println!(
+            "Removed {removed_rustlings} stale Rustlings score(s) and {removed_rcore} stale rCore score(s)"
+        );
     }
 
     Ok(failed_repositories)
@@ -197,12 +240,16 @@ async fn fetch_repositories(client: &Client, page: u32) -> TaskResult<Vec<Repo>>
 fn score_phase(repo_name: &str) -> Option<(ScorePhase, &str)> {
     if cfg!(feature = "rcore-camp-score") {
         if let Some(username) = repo_name.strip_prefix("rcore-camp-2026-") {
-            return Some((ScorePhase::RCore, username));
+            if !username.is_empty() {
+                return Some((ScorePhase::RCore, username));
+            }
         }
     }
     if cfg!(feature = "rcore-rustlings-score") {
         if let Some(username) = repo_name.strip_prefix("rcore-rustlings-2026-") {
-            return Some((ScorePhase::Rustlings, username));
+            if !username.is_empty() {
+                return Some((ScorePhase::Rustlings, username));
+            }
         }
     }
     None
@@ -512,5 +559,19 @@ mod tests {
             parse_submission_time("2026_09_02_12_34_56.txt"),
             Ok(1_788_323_696)
         );
+    }
+
+    #[test]
+    fn builds_pruning_snapshot_from_existing_score_repositories() {
+        let mut users = ActiveScoreUsers::default();
+        assert!(users.record_repository("rcore-rustlings-2026-alice"));
+        assert!(users.record_repository("rcore-rustlings-2026-carol"));
+        assert!(users.record_repository("rcore-camp-2026-bob"));
+        assert!(!users.record_repository("unrelated-repository"));
+        assert!(!users.record_repository("rcore-camp-2026-"));
+
+        let (rustlings, rcore) = users.into_sorted();
+        assert_eq!(rustlings, vec!["alice", "carol"]);
+        assert_eq!(rcore, vec!["bob"]);
     }
 }
